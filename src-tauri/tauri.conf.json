@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Browser Picker",
+  "mainBinaryName": "browser-picker",
+  "version": "0.1.0",
+  "identifier": "dev.browserpicker.desktop",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "picker",
+        "title": "Browser Picker",
+        "url": "index.html",
+        "width": 380,
+        "height": 320,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Utility",
+    "shortDescription": "Pick a browser and profile for every link",
+    "fileAssociations": [
+      {
+        "ext": ["html", "htm", "xhtml"],
+        "name": "Web page",
+        "role": "Viewer",
+        "mimeType": "text/html"
+      }
+    ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/browser-picker.desktop"
+      },
+      "rpm": {
+        "desktopTemplate": "linux/browser-picker.desktop"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name={{{name}}}
+Comment=Pick a browser and profile for every link
+Exec={{{exec}}} %u
+Icon={{{icon}}}
+Categories=Network;WebBrowser;
+MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;application/xhtml+xml;
+Terminal=false
+StartupNotify=false
