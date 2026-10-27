@@ -56,5 +56,5 @@ jobs:
         with:
           releaseId: ${{ github.event.release.id || '' }}
           tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || '' }}
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
           uploadWorkflowArtifacts: true
