@@ -1,0 +1,55 @@
+# Adds the Windows and Linux installers, update archives and latest.json entries to a release
+# published by scripts/release.sh (the macOS app is built locally). Run it manually to get them as
+# workflow artifacts. Needs the TAURI_SIGNING_PRIVATE_KEY secret (contents of ~/.tauri/browser-picker.key).
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      # One at a time: each job merges its platforms into the release's latest.json.
+      max-parallel: 1
+      matrix:
+        include:
+          - platform: windows-latest
+          - platform: ubuntu-22.04 # .deb, .rpm (Fedora) and AppImage; oldest glibc for widest support
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux dependencies
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        with:
+          releaseId: ${{ github.event.release.id || '' }}
+          includeUpdaterJson: true
+          uploadWorkflowArtifacts: true

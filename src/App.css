@@ -330,3 +330,7 @@ html[data-view="picker"] body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+button:disabled {
+  opacity: 0.5;
+}

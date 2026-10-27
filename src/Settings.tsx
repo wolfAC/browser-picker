@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { api, Snapshot, targetLabel } from "./api";
+import { api, Snapshot, targetLabel, UpdateInfo, UpdateStatus } from "./api";
 import Avatar from "./Avatar";
 
 export default function Settings() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [update, setUpdate] = useState<UpdateInfo | null>(null);
 
   const load = useCallback(() => api.snapshot().then(setSnap), []);
 
@@ -17,6 +19,14 @@ export default function Settings() {
       unlisten.then((f) => f());
     };
   }, [load]);
+
+  useEffect(() => {
+    api.updateInfo().then(setUpdate);
+    const unlisten = listen<UpdateInfo>("update-status", (e) => setUpdate(e.payload));
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
 
   const run = async (action: () => Promise<unknown>, done?: string) => {
     try {
@@ -103,6 +113,44 @@ export default function Settings() {
           </ul>
         )}
       </section>
+
+      {update && (
+        <section className="card default-card">
+          <div>
+            <h2>Version {update.version}</h2>
+            <p className="muted">{describe(update.status)}</p>
+          </div>
+          {update.status.state === "ready" ? (
+            <button className="primary" onClick={() => api.restartToUpdate()}>
+              Restart now
+            </button>
+          ) : (
+            <button
+              disabled={update.status.state === "checking" || update.status.state === "downloading"}
+              onClick={() => api.checkForUpdates()}
+            >
+              Check for updates
+            </button>
+          )}
+        </section>
+      )}
     </main>
   );
+}
+
+function describe(status: UpdateStatus): string {
+  switch (status.state) {
+    case "idle":
+      return "Updates install automatically in the background.";
+    case "checking":
+      return "Checking for updates…";
+    case "upToDate":
+      return "You have the latest version.";
+    case "downloading":
+      return `Downloading version ${status.version}…`;
+    case "ready":
+      return `Version ${status.version} is installed and starts once this window is closed.`;
+    case "failed":
+      return `Update check failed: ${status.message}`;
+  }
 }

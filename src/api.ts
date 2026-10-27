@@ -33,6 +33,16 @@ export interface Snapshot {
   isDefault: boolean;
 }
 
+export type UpdateStatus =
+  | { state: "idle" | "checking" | "upToDate" }
+  | { state: "downloading" | "ready"; version: string }
+  | { state: "failed"; message: string };
+
+export interface UpdateInfo {
+  version: string;
+  status: UpdateStatus;
+}
+
 /** One row in the picker: a browser, or one profile of a browser. */
 export interface Target {
   id: string;
@@ -53,6 +63,9 @@ export const api = {
   refreshBrowsers: () => invoke("refresh_browsers"),
   makeDefault: () => invoke("make_default"),
   openSettings: () => invoke("open_settings"),
+  updateInfo: () => invoke<UpdateInfo>("update_info"),
+  checkForUpdates: () => invoke("check_for_updates"),
+  restartToUpdate: () => invoke("restart_to_update"),
 };
 
 /** Browsers with several profiles show one row per profile; the rest show one row. */

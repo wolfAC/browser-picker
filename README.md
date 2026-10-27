@@ -30,12 +30,34 @@ Other browsers (Safari, Arc, Opera and the rest) are listed without profiles.
 | Windows | Reads `Clients\StartMenuInternet` (HKCU and HKLM) | Registers under HKCU, then opens Settings › Default apps |
 | Linux   | Finds `.desktop` entries for `x-scheme-handler/https` (including Flatpak and Snap) | Writes a user `.desktop` file, then runs `xdg-settings` and `xdg-mime` |
 
+## Updates
+
+Installed copies check `https://github.com/wolfAC/browser-picker/releases/latest/download/latest.json`
+30 seconds after launch and then every 6 hours. A new version downloads and installs in the
+background, and the app restarts into it once no picker or settings window is open. You can also
+use **Check for Updates…** in the tray menu or the button in Settings. Development builds never update.
+
+Updates are signed. The private key is `~/.tauri/browser-picker.key` (keep it backed up, because
+without it installed copies can't be updated). The public key is in `tauri.conf.json`.
+
+### Release
+
+```sh
+scripts/release.sh 0.2.0
+```
+
+This bumps the version, tags it, builds and signs the universal macOS app, and publishes a GitHub
+release with the DMG, the update archive and `latest.json`. `.github/workflows/release.yml` then
+adds the Windows and Linux installers and their `latest.json` entries. The workflow needs the repo
+secret `TAURI_SIGNING_PRIVATE_KEY` (`gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/browser-picker.key`).
+
 ## Develop
 
 ```sh
 pnpm install
 pnpm tauri dev                     # settings window; the picker needs a URL
-pnpm tauri build                   # installers for the current OS
+TAURI_SIGNING_PRIVATE_KEY="$(cat ~/.tauri/browser-picker.key)" TAURI_SIGNING_PRIVATE_KEY_PASSWORD= \
+  pnpm tauri build                 # installers for the current OS (update archives need the key)
 cd src-tauri && cargo test -- --ignored --nocapture   # list this machine's browsers and profiles
 ```
 

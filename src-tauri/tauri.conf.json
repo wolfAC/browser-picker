@@ -44,7 +44,11 @@
     "shortDescription": "Pick a browser and profile for every link",
     "fileAssociations": [
       {
-        "ext": ["html", "htm", "xhtml"],
+        "ext": [
+          "html",
+          "htm",
+          "xhtml"
+        ],
         "name": "Web page",
         "role": "Viewer",
         "mimeType": "text/html"
@@ -60,6 +64,18 @@
     },
     "macOS": {
       "minimumSystemVersion": "10.15"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVFOTI1RTlGQzlFRjY3NjAKUldSZ1orL0puMTZTN25FU0hYcHkzV2pLbWJxRzdRM3NobUIwd05kOXBGbWxpWGZaT1F6Z2ZtWVoK",
+      "endpoints": [
+        "https://github.com/wolfAC/browser-picker/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

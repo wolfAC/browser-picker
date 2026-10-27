@@ -1,5 +1,6 @@
 mod browsers;
 mod config;
+mod updates;
 
 use std::{path::PathBuf, sync::Mutex};
 
@@ -184,6 +185,21 @@ fn open_settings(app: AppHandle) {
     show_settings(&app);
 }
 
+#[tauri::command]
+fn update_info(app: AppHandle) -> updates::Info {
+    updates::info(&app)
+}
+
+#[tauri::command]
+fn check_for_updates(app: AppHandle) {
+    std::thread::spawn(move || updates::check_now(&app));
+}
+
+#[tauri::command]
+fn restart_to_update(app: AppHandle) {
+    app.restart();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
@@ -192,6 +208,8 @@ pub fn run() {
             None => show_settings(app),
         }))
         .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Info).build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::Updates::default())
         .invoke_handler(tauri::generate_handler![
             snapshot,
             present_picker,
@@ -202,6 +220,9 @@ pub fn run() {
             refresh_browsers,
             make_default,
             open_settings,
+            update_info,
+            check_for_updates,
+            restart_to_update,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -217,13 +238,18 @@ pub fn run() {
             });
 
             let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
+            let update = MenuItem::with_id(app, "update", "Check for Updates…", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Browser Picker", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&settings, &PredefinedMenuItem::separator(app)?, &quit])?;
+            let menu = Menu::with_items(app, &[&settings, &update, &PredefinedMenuItem::separator(app)?, &quit])?;
             let mut tray = TrayIconBuilder::with_id("tray")
                 .tooltip("Browser Picker")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "settings" => show_settings(app),
+                    "update" => {
+                        show_settings(app);
+                        check_for_updates(app.clone());
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 });
@@ -238,6 +264,7 @@ pub fn run() {
                 tray = tray.icon(icon.clone());
             }
             tray.build(app)?;
+            updates::start(app.handle());
 
             // Windows and Linux pass the link on the command line; macOS sends
             // it as an `Opened` event once the app is running.
