@@ -160,6 +160,8 @@ pub const KNOWN: &[Known] = &[
         win_data: &["Mozilla/Firefox"],
         linux_data: &[
             ".mozilla/firefox",
+            // Firefox 147+ uses the XDG config dir when there is no ~/.mozilla yet.
+            ".config/mozilla/firefox",
             "snap/firefox/common/.mozilla/firefox",
             ".var/app/org.mozilla.firefox/.mozilla/firefox",
         ],
@@ -291,14 +293,17 @@ pub fn discover() -> Vec<Browser> {
     list
 }
 
+/// Reads the first data dir that has profiles; a browser can leave an empty
+/// legacy dir behind (Firefox 147+ recreates `~/.mozilla` next to the XDG one).
 fn read_profiles(known: &Known) -> Vec<RawProfile> {
-    let Some(dir) = platform::data_dirs(known).into_iter().find(|d| d.exists()) else {
-        return Vec::new();
-    };
-    match known.family {
-        Family::Chromium => chromium::profiles(&dir),
-        Family::Firefox => firefox::profiles(&dir),
-    }
+    platform::data_dirs(known)
+        .iter()
+        .map(|dir| match known.family {
+            Family::Chromium => chromium::profiles(dir),
+            Family::Firefox => firefox::profiles(dir),
+        })
+        .find(|profiles| !profiles.is_empty())
+        .unwrap_or_default()
 }
 
 /// Opens `url` with a browser (`"chrome"`) or one of its profiles (`"chrome/Profile 1"`).

@@ -9,6 +9,8 @@ use std::{
 use super::{Installed, Known, image_data_url, spawn};
 
 const SELF_ID: &str = "browser-picker.desktop";
+/// Ours from `make_default`, and the one the deb/rpm packages install (named after the product).
+const SELF_IDS: &[&str] = &[SELF_ID, "Browser Picker.desktop"];
 
 fn data_roots() -> Vec<PathBuf> {
     let home = dirs::home_dir().unwrap_or_default();
@@ -32,7 +34,7 @@ pub fn installed() -> Vec<Installed> {
         for path in entries.flatten().map(|e| e.path()) {
             let Some(id) = path.file_name().map(|f| f.to_string_lossy().into_owned()) else { continue };
             // Earlier roots (the user's own) shadow later ones with the same id.
-            if !id.ends_with(".desktop") || id == SELF_ID || !seen.insert(id.clone()) {
+            if !id.ends_with(".desktop") || SELF_IDS.contains(&id.as_str()) || !seen.insert(id.clone()) {
                 continue;
             }
             if let Some(app) = inspect(&path, id, &roots) {
@@ -64,8 +66,7 @@ fn inspect(path: &Path, id: String, roots: &[PathBuf]) -> Option<Installed> {
         return None;
     }
     let exec = exec_argv(entry.get("Exec")?)?;
-    let self_exe = std::env::current_exe().ok();
-    if self_exe.is_some_and(|me| Path::new(&exec[0]) == me) {
+    if is_self(&exec[0]) {
         return None;
     }
     Some(Installed {
@@ -75,6 +76,22 @@ fn inspect(path: &Path, id: String, roots: &[PathBuf]) -> Option<Installed> {
         id,
         launch: exec,
     })
+}
+
+/// Whether an `Exec=` program is this app, e.g. a renamed copy of our desktop entry.
+/// Packaged entries name the binary bare (`browser-picker`), so it is looked up on `PATH`.
+fn is_self(program: &str) -> bool {
+    let program = Path::new(program);
+    let resolved = if program.components().count() > 1 {
+        Some(program.to_path_buf())
+    } else {
+        std::env::var_os("PATH")
+            .and_then(|path| std::env::split_paths(&path).map(|d| d.join(program)).find(|p| p.is_file()))
+    };
+    let Some(resolved) = resolved.and_then(|p| p.canonicalize().ok()) else { return false };
+    // AppImages run from a temporary mount; the stable path is in $APPIMAGE.
+    let me = [std::env::current_exe().ok(), std::env::var_os("APPIMAGE").map(PathBuf::from)];
+    me.into_iter().flatten().filter_map(|p| p.canonicalize().ok()).any(|p| p == resolved)
 }
 
 /// Splits an `Exec=` line and drops field codes (`%u`, `%U`, ...) and flatpak's
@@ -132,7 +149,7 @@ pub fn is_default() -> bool {
     Command::new("xdg-settings")
         .args(["get", "default-web-browser"])
         .output()
-        .is_ok_and(|o| String::from_utf8_lossy(&o.stdout).trim() == SELF_ID)
+        .is_ok_and(|o| SELF_IDS.contains(&String::from_utf8_lossy(&o.stdout).trim()))
 }
 
 /// Writes a user-level desktop entry pointing at this binary and makes it the
