@@ -53,7 +53,13 @@ export default function Settings() {
               : "Make it the default so links from other apps show the picker."}
           </p>
         </div>
-        {!snap.isDefault && (
+        {snap.isDefault ? (
+          <span className="success-badge" role="img" aria-label="Set as default">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        ) : (
           <button className="primary" onClick={() => run(api.makeDefault, "Confirm the change in the system prompt or settings page.")}>
             Make default
           </button>
@@ -120,9 +126,9 @@ export default function Settings() {
             <h2>Version {update.version}</h2>
             <p className="muted">{describe(update.status)}</p>
           </div>
-          {update.status.state === "ready" ? (
-            <button className="primary" onClick={() => api.restartToUpdate()}>
-              Restart now
+          {update.status.state === "available" ? (
+            <button className="primary" onClick={() => api.installUpdate()}>
+              Update
             </button>
           ) : (
             <button
@@ -141,16 +147,16 @@ export default function Settings() {
 function describe(status: UpdateStatus): string {
   switch (status.state) {
     case "idle":
-      return "Updates install automatically in the background.";
+      return "Checks for updates when Browser Picker starts.";
     case "checking":
       return "Checking for updates…";
     case "upToDate":
       return "You have the latest version.";
+    case "available":
+      return `Version ${status.version} is available. Browser Picker restarts to finish installing.`;
     case "downloading":
       return `Downloading version ${status.version}…`;
-    case "ready":
-      return `Version ${status.version} is installed and starts once this window is closed.`;
     case "failed":
-      return `Update check failed: ${status.message}`;
+      return status.message.startsWith("Update failed") ? status.message : `Update check failed: ${status.message}`;
   }
 }

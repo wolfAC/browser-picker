@@ -7,6 +7,8 @@
   --accent: #4f6bff;
   --accent-soft: #e8ecff;
   --danger: #c0352b;
+  --success: #1f9d55;
+  --success-soft: #e3f6ea;
 
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
   font-size: 13px;
@@ -28,6 +30,8 @@
     --accent: #7c8cff;
     --accent-soft: #33385c;
     --danger: #ff6b5e;
+    --success: #4cd47f;
+    --success-soft: #1f3a2a;
   }
 }
 
@@ -279,6 +283,17 @@ html[data-view="picker"] body {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.success-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--success);
+  background: var(--success-soft);
 }
 
 .message {

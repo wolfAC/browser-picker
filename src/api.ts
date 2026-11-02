@@ -35,7 +35,7 @@ export interface Snapshot {
 
 export type UpdateStatus =
   | { state: "idle" | "checking" | "upToDate" }
-  | { state: "downloading" | "ready"; version: string }
+  | { state: "available" | "downloading"; version: string }
   | { state: "failed"; message: string };
 
 export interface UpdateInfo {
@@ -65,7 +65,7 @@ export const api = {
   openSettings: () => invoke("open_settings"),
   updateInfo: () => invoke<UpdateInfo>("update_info"),
   checkForUpdates: () => invoke("check_for_updates"),
-  restartToUpdate: () => invoke("restart_to_update"),
+  installUpdate: () => invoke("install_update"),
 };
 
 /** Browsers with several profiles show one row per profile; the rest show one row. */

@@ -33,9 +33,9 @@ Other browsers (Safari, Arc, Opera and the rest) are listed without profiles.
 ## Updates
 
 Installed copies check `https://github.com/wolfAC/browser-picker/releases/latest/download/latest.json`
-30 seconds after launch and then every 6 hours. A new version downloads and installs in the
-background, and the app restarts into it once no picker or settings window is open. You can also
-use **Check for Updates…** in the tray menu or the button in Settings. Development builds never update.
+once when the app starts. Nothing is installed automatically: Settings shows the new version with an
+**Update** button, which downloads it, installs it and restarts the app. **Check for Updates…** in the
+tray menu, or the button in Settings, checks again at any time. Development builds never update.
 
 Updates are signed. The private key is `~/.tauri/browser-picker.key` (keep it backed up, because
 without it installed copies can't be updated). The public key is in `tauri.conf.json`.

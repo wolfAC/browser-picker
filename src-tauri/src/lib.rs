@@ -211,8 +211,8 @@ fn check_for_updates(app: AppHandle) {
 }
 
 #[tauri::command]
-fn restart_to_update(app: AppHandle) {
-    app.restart();
+fn install_update(app: AppHandle) {
+    std::thread::spawn(move || updates::install_now(&app));
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -237,7 +237,7 @@ pub fn run() {
             open_settings,
             update_info,
             check_for_updates,
-            restart_to_update,
+            install_update,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
