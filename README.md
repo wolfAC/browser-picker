@@ -28,7 +28,7 @@ Other browsers (Safari, Arc, Opera and the rest) are listed without profiles.
 | ------- | ----------------------------------------------- | -------------------------------------------------------- |
 | macOS   | Scans app bundles that declare `https` in `Info.plist` | `LSSetDefaultHandlerForURLScheme`, which shows a system prompt |
 | Windows | Reads `Clients\StartMenuInternet` (HKCU and HKLM) | Registers under HKCU, then opens Settings › Default apps |
-| Linux   | Finds `.desktop` entries for `x-scheme-handler/https` (including Flatpak and Snap) | Writes a user `.desktop` file, then runs `xdg-settings` and `xdg-mime` |
+| Linux   | Finds `.desktop` entries for `x-scheme-handler/https` (including Flatpak and Snap) | Writes a user `.desktop` file and `mimeapps.list`, then runs `xdg-settings` and `gio mime` |
 
 ## Updates
 

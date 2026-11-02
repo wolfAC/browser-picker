@@ -22,6 +22,7 @@
         "decorations": false,
         "resizable": false,
         "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
         "skipTaskbar": true,
         "shadow": true
       }
@@ -65,7 +66,14 @@
     "macOS": {
       "minimumSystemVersion": "10.15"
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/nsis-header.bmp",
+        "sidebarImage": "icons/nsis-sidebar.bmp"
+      }
+    }
   },
   "plugins": {
     "updater": {

@@ -145,11 +145,20 @@ pub fn launch(launch: &[String], args: &[String], url: &str) -> std::io::Result<
     spawn(command)
 }
 
+/// Link and page types we take over when made the default.
+const HANDLED: &[&str] =
+    &["x-scheme-handler/http", "x-scheme-handler/https", "text/html", "application/xhtml+xml"];
+
 pub fn is_default() -> bool {
-    Command::new("xdg-settings")
+    let xdg = Command::new("xdg-settings")
         .args(["get", "default-web-browser"])
         .output()
-        .is_ok_and(|o| SELF_IDS.contains(&String::from_utf8_lossy(&o.stdout).trim()))
+        .is_ok_and(|o| SELF_IDS.contains(&String::from_utf8_lossy(&o.stdout).trim()));
+    // xdg-settings is missing on some systems and unreliable on others; mimeapps.list is what
+    // GLib (GNOME/Fedora) and KDE actually read.
+    xdg || mimeapps_files().iter().find_map(|f| default_in(f, "x-scheme-handler/https")).is_some_and(|id| {
+        SELF_IDS.contains(&id.as_str())
+    })
 }
 
 /// Writes a user-level desktop entry pointing at this binary and makes it the
@@ -163,19 +172,124 @@ pub fn make_default() -> Result<(), String> {
     let entry = format!(
         "[Desktop Entry]\nType=Application\nName=Browser Picker\nComment=Pick a browser and profile for every link\n\
          Exec=\"{}\" %u\nIcon=browser-picker\nCategories=Network;WebBrowser;\nTerminal=false\nStartupNotify=false\n\
-         MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;application/xhtml+xml;\n",
-        exe.display()
+         MimeType={};\n",
+        exe.display(),
+        HANDLED.join(";")
     );
     std::fs::write(dir.join(SELF_ID), entry).map_err(|e| e.to_string())?;
     let _ = Command::new("update-desktop-database").arg(&dir).status();
 
-    let ok = Command::new("xdg-settings")
+    // Write the defaults ourselves first: this works on every desktop that follows the XDG
+    // spec, even without xdg-utils. Desktop-specific lists (e.g. gnome-mimeapps.list) override
+    // the plain one, so update those too when they exist.
+    let config = dirs::config_dir().ok_or("No config directory")?;
+    std::fs::create_dir_all(&config).map_err(|e| e.to_string())?;
+    let mut written = false;
+    let files = mimeapps_files();
+    for (i, file) in files.iter().enumerate() {
+        // The last entry is the plain mimeapps.list, which is always written.
+        if i + 1 < files.len() && !file.exists() {
+            continue;
+        }
+        let current = std::fs::read_to_string(file).unwrap_or_default();
+        match std::fs::write(file, set_defaults(&current, SELF_ID, HANDLED)) {
+            Ok(()) => written = true,
+            Err(e) => log::warn!("Could not update {}: {e}", file.display()),
+        }
+    }
+
+    // Then let the desktop's own tools record it (KDE keeps its browser in kdeglobals).
+    let xdg_ok = Command::new("xdg-settings")
         .args(["set", "default-web-browser", SELF_ID])
         .status()
         .is_ok_and(|s| s.success());
-    let mime_ok = Command::new("xdg-mime")
-        .args(["default", SELF_ID, "x-scheme-handler/http", "x-scheme-handler/https", "text/html"])
-        .status()
-        .is_ok_and(|s| s.success());
-    if ok || mime_ok { Ok(()) } else { Err("xdg-settings and xdg-mime both failed".into()) }
+    for mime in HANDLED {
+        let _ = Command::new("gio").args(["mime", mime, SELF_ID]).output();
+    }
+    if written || xdg_ok { Ok(()) } else { Err("Could not update mimeapps.list or run xdg-settings".into()) }
+}
+
+/// The user's mimeapps.list files in priority order: desktop-specific ones first, plain last.
+fn mimeapps_files() -> Vec<PathBuf> {
+    let Some(config) = dirs::config_dir() else { return Vec::new() };
+    let mut files: Vec<PathBuf> = std::env::var("XDG_CURRENT_DESKTOP")
+        .unwrap_or_default()
+        .split(':')
+        .filter(|d| !d.is_empty())
+        .map(|d| config.join(format!("{}-mimeapps.list", d.to_lowercase())))
+        .collect();
+    files.push(config.join("mimeapps.list"));
+    files
+}
+
+/// The first app listed for `mime` under `[Default Applications]`.
+fn default_in(file: &Path, mime: &str) -> Option<String> {
+    let text = std::fs::read_to_string(file).ok()?;
+    let mut in_defaults = false;
+    for line in text.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_defaults = line == "[Default Applications]";
+        } else if in_defaults && let Some((key, value)) = line.split_once('=') {
+            if key.trim() == mime {
+                return value.split(';').map(str::trim).find(|v| !v.is_empty()).map(str::to_string);
+            }
+        }
+    }
+    None
+}
+
+/// Returns `text` (a mimeapps.list) with `app` as the default for each of `mimes`, keeping
+/// everything else as it was.
+fn set_defaults(text: &str, app: &str, mimes: &[&str]) -> String {
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    let section = lines.iter().position(|l| l.trim() == "[Default Applications]");
+    let section = match section {
+        Some(i) => i,
+        None => {
+            if lines.last().is_some_and(|l| !l.trim().is_empty()) {
+                lines.push(String::new());
+            }
+            lines.push("[Default Applications]".into());
+            lines.len() - 1
+        }
+    };
+    let end = lines[section + 1..]
+        .iter()
+        .position(|l| l.trim().starts_with('['))
+        .map_or(lines.len(), |i| section + 1 + i);
+    // Drop our keys from the section, then add them right after its header.
+    let mut kept: Vec<String> = lines[section + 1..end]
+        .iter()
+        .filter(|l| !l.split_once('=').is_some_and(|(k, _)| mimes.contains(&k.trim())))
+        .cloned()
+        .collect();
+    let mut ours: Vec<String> = mimes.iter().map(|m| format!("{m}={app};")).collect();
+    ours.append(&mut kept);
+    lines.splice(section + 1..end, ours);
+    let mut out = lines.join("\n");
+    out.push('\n');
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::set_defaults;
+
+    #[test]
+    fn sets_defaults_and_keeps_other_entries() {
+        let before = "[Added Associations]\ntext/plain=gedit.desktop;\n\n[Default Applications]\n\
+                      x-scheme-handler/https=firefox.desktop;\nimage/png=eog.desktop;\n";
+        let after = set_defaults(before, "bp.desktop", &["x-scheme-handler/http", "x-scheme-handler/https"]);
+        assert_eq!(
+            after,
+            "[Added Associations]\ntext/plain=gedit.desktop;\n\n[Default Applications]\n\
+             x-scheme-handler/http=bp.desktop;\nx-scheme-handler/https=bp.desktop;\nimage/png=eog.desktop;\n"
+        );
+    }
+
+    #[test]
+    fn adds_the_section_when_missing() {
+        let after = set_defaults("", "bp.desktop", &["text/html"]);
+        assert_eq!(after, "[Default Applications]\ntext/html=bp.desktop;\n");
+    }
 }

@@ -72,8 +72,19 @@ fn handle_url(app: &AppHandle, url: String) {
         }
     }
     *state.pending.lock().unwrap() = Some(url.clone());
-    // The picker sizes itself to its content, then calls `present_picker`.
     let _ = app.emit_to("picker", "open-url", url);
+    // Show it right away: a hidden webview may not run its scripts (macOS suspends it), so waiting
+    // for the page to ask would leave the link stuck. The page then resizes it via `present_picker`.
+    if let Some(window) = app.get_webview_window("picker") {
+        let height = window
+            .inner_size()
+            .ok()
+            .zip(window.scale_factor().ok())
+            .map_or(320.0, |(size, scale)| size.height as f64 / scale);
+        if let Err(e) = place_picker(app, height) {
+            log::error!("Could not show the picker: {e}");
+        }
+    }
 }
 
 fn hide_picker(app: &AppHandle) {
@@ -117,6 +128,10 @@ fn snapshot(state: tauri::State<AppState>) -> Snapshot {
 /// Places the picker under the cursor, kept inside the screen's work area.
 #[tauri::command]
 fn present_picker(app: AppHandle, height: f64) -> Result<(), String> {
+    place_picker(&app, height)
+}
+
+fn place_picker(app: &AppHandle, height: f64) -> Result<(), String> {
     let window = app.get_webview_window("picker").ok_or("Picker window is missing")?;
     window.set_size(LogicalSize::new(PICKER_WIDTH, height)).map_err(|e| e.to_string())?;
 

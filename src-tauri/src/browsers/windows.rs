@@ -1,6 +1,7 @@
 //! Windows: browsers register under `Clients\StartMenuInternet`.
 
 use std::{
+    ffi::c_void,
     os::windows::process::CommandExt,
     path::{Path, PathBuf},
     process::Command,
@@ -97,13 +98,54 @@ pub fn is_default() -> bool {
 /// page: Windows only lets the user pick the default browser there.
 pub fn make_default() -> Result<(), String> {
     register().map_err(|e| format!("Could not register Browser Picker: {e}"))?;
-    let page = format!("ms-settings:defaultapps?registeredAppUser={SELF_KEY}");
-    spawn({
-        let mut c = Command::new("explorer.exe");
-        c.arg(page);
-        c
-    })
-    .map_err(|e| e.to_string())
+    // Tell the shell the associations changed so Settings lists us straight away.
+    unsafe { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, std::ptr::null(), std::ptr::null()) };
+    // `explorer.exe <uri>` mis-parses the `?` query and opens a folder instead, so hand the
+    // URI to the shell directly. Older Windows ignore the query and open plain Default apps.
+    if !shell_open(&format!("ms-settings:defaultapps?registeredAppUser={SELF_KEY}"))
+        && !shell_open("ms-settings:defaultapps")
+    {
+        return Err("Could not open Settings › Default apps. Open it and choose Browser Picker.".into());
+    }
+    Ok(())
+}
+
+const SHCNE_ASSOCCHANGED: i32 = 0x0800_0000;
+const SHCNF_IDLIST: u32 = 0;
+
+#[link(name = "shell32")]
+unsafe extern "system" {
+    fn SHChangeNotify(event: i32, flags: u32, item1: *const c_void, item2: *const c_void);
+    fn ShellExecuteW(
+        hwnd: *mut c_void,
+        operation: *const u16,
+        file: *const u16,
+        parameters: *const u16,
+        directory: *const u16,
+        show: i32,
+    ) -> isize;
+}
+
+fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// Opens a URI with its registered handler; true on success.
+fn shell_open(uri: &str) -> bool {
+    const SW_SHOWNORMAL: i32 = 1;
+    let (verb, uri) = (wide("open"), wide(uri));
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            verb.as_ptr(),
+            uri.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    // Values above 32 mean success.
+    result > 32
 }
 
 fn register() -> std::io::Result<()> {
@@ -128,6 +170,7 @@ fn register() -> std::io::Result<()> {
     caps.set_value("ApplicationName", &"Browser Picker")?;
     caps.set_value("ApplicationDescription", &"Pick a browser and profile for every link")?;
     caps.set_value("ApplicationIcon", &icon)?;
+    caps.create_subkey("StartMenu")?.0.set_value("StartMenuInternet", &SELF_KEY)?;
     let (urls, _) = caps.create_subkey("URLAssociations")?;
     for scheme in ["http", "https"] {
         urls.set_value(scheme, &PROG_ID)?;
