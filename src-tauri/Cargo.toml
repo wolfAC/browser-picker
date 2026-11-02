@@ -1,6 +1,6 @@
 [package]
 name = "browser-picker"
-version = "0.1.1"
+version = "0.1.2"
 description = "Pick a browser and profile for every link you open"
 authors = ["you"]
 edition = "2024"
