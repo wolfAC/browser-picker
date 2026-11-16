@@ -23,6 +23,7 @@ export interface Rule {
 export interface Config {
   hidden: string[];
   rules: Rule[];
+  login_asked: boolean;
 }
 
 export interface Snapshot {
@@ -31,6 +32,7 @@ export interface Snapshot {
   browsers: Browser[];
   config: Config;
   isDefault: boolean;
+  startAtLogin: boolean;
 }
 
 export type UpdateStatus =
@@ -66,6 +68,7 @@ export const api = {
   updateInfo: () => invoke<UpdateInfo>("update_info"),
   checkForUpdates: () => invoke("check_for_updates"),
   installUpdate: () => invoke("install_update"),
+  setStartAtLogin: (enabled: boolean) => invoke("set_start_at_login", { enabled }),
 };
 
 /** Browsers with several profiles show one row per profile; the rest show one row. */

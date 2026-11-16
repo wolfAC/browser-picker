@@ -67,6 +67,28 @@ export default function Settings() {
       </section>
       {message && <p className="message">{message}</p>}
 
+      {!snap.config.login_asked ? (
+        <section className="card default-card">
+          <div>
+            <h2>Start Browser Picker when you log in?</h2>
+            <p className="muted">It runs in the background so links open the picker right after you restart.</p>
+          </div>
+          <div className="button-row">
+            <button onClick={() => run(() => api.setStartAtLogin(false))}>Not now</button>
+            <button className="primary" onClick={() => run(() => api.setStartAtLogin(true))}>
+              Allow
+            </button>
+          </div>
+        </section>
+      ) : (
+        <section className="card">
+          <label className="check-row">
+            <input type="checkbox" checked={snap.startAtLogin} onChange={() => run(() => api.setStartAtLogin(!snap.startAtLogin))} />
+            <span className="row-title">Start Browser Picker at login</span>
+          </label>
+        </section>
+      )}
+
       <section className="card">
         <div className="card-head">
           <h2>Browsers</h2>

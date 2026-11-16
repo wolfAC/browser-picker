@@ -349,3 +349,9 @@ html[data-view="picker"] body {
 button:disabled {
   opacity: 0.5;
 }
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}

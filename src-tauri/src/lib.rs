@@ -13,9 +13,12 @@ use tauri::{
 };
 
 use browsers::Browser;
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use config::{Config, host_of};
 
 const PICKER_WIDTH: f64 = 380.0;
+/// Passed by the login item so a start at login stays in the tray.
+const AUTOSTART_ARG: &str = "--autostart";
 
 struct AppState {
     browsers: Mutex<Vec<Browser>>,
@@ -41,6 +44,7 @@ struct Snapshot {
     browsers: Vec<Browser>,
     config: Config,
     is_default: bool,
+    start_at_login: bool,
 }
 
 /// First argument that is a web link or an HTML file (Windows passes file paths).
@@ -114,7 +118,7 @@ fn show_settings(app: &AppHandle) {
 }
 
 #[tauri::command]
-fn snapshot(state: tauri::State<AppState>) -> Snapshot {
+fn snapshot(app: AppHandle, state: tauri::State<AppState>) -> Snapshot {
     let url = state.pending.lock().unwrap().clone();
     Snapshot {
         host: url.as_deref().and_then(host_of),
@@ -122,7 +126,16 @@ fn snapshot(state: tauri::State<AppState>) -> Snapshot {
         browsers: state.browsers.lock().unwrap().clone(),
         config: state.config.lock().unwrap().clone(),
         is_default: browsers::is_default(),
+        start_at_login: app.autolaunch().is_enabled().unwrap_or(false),
     }
+}
+
+/// Turns the login item on or off and records that the user has answered.
+#[tauri::command]
+fn set_start_at_login(app: AppHandle, state: tauri::State<AppState>, enabled: bool) -> Result<(), String> {
+    let launcher = app.autolaunch();
+    if enabled { launcher.enable() } else { launcher.disable() }.map_err(|e| e.to_string())?;
+    state.update_config(|c| c.login_asked = true)
 }
 
 /// Places the picker under the cursor, kept inside the screen's work area.
@@ -224,6 +237,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_log::Builder::new().level(log::LevelFilter::Info).build())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, Some(vec![AUTOSTART_ARG])))
         .manage(updates::Updates::default())
         .invoke_handler(tauri::generate_handler![
             snapshot,
@@ -238,6 +252,7 @@ pub fn run() {
             update_info,
             check_for_updates,
             install_update,
+            set_start_at_login,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -245,9 +260,12 @@ pub fn run() {
 
             let config_path = app.path().app_config_dir()?.join("config.json");
             let first_run = !config_path.exists();
+            let config = Config::load(&config_path);
+            // Settings asks once whether to start at login, so open it until that's answered.
+            let ask_login = !config.login_asked;
             app.manage(AppState {
                 browsers: Mutex::new(browsers::discover()),
-                config: Mutex::new(Config::load(&config_path)),
+                config: Mutex::new(config),
                 config_path,
                 pending: Mutex::new(None),
             });
@@ -284,9 +302,10 @@ pub fn run() {
             // Windows and Linux pass the link on the command line; macOS sends
             // it as an `Opened` event once the app is running.
             let args: Vec<String> = std::env::args().collect();
+            let at_login = args.iter().any(|a| a == AUTOSTART_ARG);
             if let Some(url) = url_from_args(&args) {
                 handle_url(app.handle(), url);
-            } else if first_run || cfg!(not(target_os = "macos")) {
+            } else if first_run || ask_login || (!at_login && cfg!(not(target_os = "macos"))) {
                 show_settings(app.handle());
             }
             Ok(())

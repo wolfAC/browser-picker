@@ -15,6 +15,8 @@ pub struct Config {
     /// Browser or profile ids left out of the picker.
     pub hidden: Vec<String>,
     pub rules: Vec<Rule>,
+    /// Whether the user has answered "Start Browser Picker at login?".
+    pub login_asked: bool,
 }
 
 impl Config {
