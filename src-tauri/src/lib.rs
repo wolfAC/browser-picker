@@ -163,8 +163,27 @@ fn place_picker(app: &AppHandle, height: f64) -> Result<(), String> {
     if placed.is_none() {
         let _ = window.center();
     }
+    #[cfg(target_os = "macos")]
+    allow_over_full_screen(&window);
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())
+}
+
+/// Lets the picker appear in the current Space, including over a full-screen app such as
+/// VS Code. Without `FullScreenAuxiliary`, macOS shows it on the desktop Space instead,
+/// where nobody sees it, and the link seems to do nothing.
+#[cfg(target_os = "macos")]
+fn allow_over_full_screen(window: &tauri::WebviewWindow) {
+    use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+    let Ok(ptr) = window.ns_window() else { return };
+    // SAFETY: Tauri hands back the window's live NSWindow, and this runs on the main thread
+    // (Opened events, the single-instance callback and commands that show the picker).
+    let ns_window = unsafe { &*ptr.cast::<NSWindow>() };
+    ns_window.setCollectionBehavior(
+        ns_window.collectionBehavior()
+            | NSWindowCollectionBehavior::CanJoinAllSpaces
+            | NSWindowCollectionBehavior::FullScreenAuxiliary,
+    );
 }
 
 #[tauri::command]

@@ -29,6 +29,7 @@ tauri-plugin-autostart = "2"
 plist = "1"
 icns = "0.3"
 core-foundation = "0.10"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSResponder", "NSWindow"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.55"

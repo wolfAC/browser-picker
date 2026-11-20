@@ -368,6 +368,7 @@ dependencies = [
  "dirs 6.0.0",
  "icns",
  "log",
+ "objc2-app-kit",
  "plist",
  "serde",
  "serde_json",
